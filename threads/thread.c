@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -27,6 +28,8 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -92,6 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init(&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -585,3 +589,35 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void thread_sleep(int64_t ticks) {
+  enum intr_level level = intr_disable();
+  thread_current()->sleep_length = timer_ticks() + ticks;
+  list_insert_ordered(&sleep_list, &thread_current()->elem, sort_sleep, NULL);
+  thread_block();
+  intr_set_level(level);
+}
+
+void thread_wake(void) {
+  struct list_elem *e;
+  struct thread *td;
+  int64_t ticks = timer_ticks();
+
+  while(!list_empty(&sleep_list)) {
+    e = list_front(&sleep_list);
+    td = list_entry(e, struct thread, elem);
+
+    if(td->sleep_length > ticks) break;
+
+    list_remove(e);
+    thread_unblock(td);
+  }
+}
+
+bool sort_sleep(const struct list_elem *first, const struct list_elem *second, void *aux) {
+  struct thread *td1 = list_entry(first, struct thread, elem);
+  struct thread *td2 = list_entry(second, struct thread, elem);
+
+  return td1->sleep_length < td2->sleep_length;
+}
+
