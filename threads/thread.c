@@ -213,6 +213,13 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  old_level = intr_disable();
+  if(t->priority > thread_current()->priority) {
+    thread_yield();
+  }
+
+  intr_set_level(old_level);
+
   return tid;
 }
 
@@ -250,6 +257,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  list_sort(&ready_list, sort_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -319,8 +327,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread) {
     list_push_back (&ready_list, &cur->elem);
+    list_sort(&ready_list, sort_priority, NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -348,6 +358,18 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+
+  enum intr_level level = intr_disable();
+
+  if(!list_empty(&ready_list)) {
+    struct list_elem *e = list_front(&ready_list);
+    struct thread *td = list_entry(e, struct thread, elem);
+
+    if(td->priority > thread_current()->priority) {
+      thread_yield();
+    }
+  }
+  intr_set_level(level);
 }
 
 /* Returns the current thread's priority. */
@@ -619,5 +641,12 @@ bool sort_sleep(const struct list_elem *first, const struct list_elem *second, v
   struct thread *td2 = list_entry(second, struct thread, elem);
 
   return td1->sleep_length < td2->sleep_length;
+}
+
+bool sort_priority(const struct list_elem *first, const struct list_elem *second, void *aux) {
+  struct thread *td1 = list_entry(first, struct thread, elem);
+  struct thread *td2 = list_entry(second, struct thread, elem);
+
+  return td1->priority > td2->priority;
 }
 

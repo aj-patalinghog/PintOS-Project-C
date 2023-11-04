@@ -143,5 +143,6 @@ int thread_get_load_avg (void);
 void thread_sleep(int64_t ticks);
 void thread_wake(void);
 bool sort_sleep(const struct list_elem *first, const struct list_elem *second, void *aux);
+bool sort_priority(const struct list_elem *first, const struct list_elem *second, void *aux);
 
 #endif /* threads/thread.h */
