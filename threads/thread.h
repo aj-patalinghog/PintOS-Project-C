@@ -94,6 +94,11 @@ struct thread
     struct list_elem elem;              /* List element. */
 
     int64_t sleep_length;
+    struct list_elem donor;
+    int base_priority;
+    struct thread *locker;
+    struct list donors;
+    struct lock *lock;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

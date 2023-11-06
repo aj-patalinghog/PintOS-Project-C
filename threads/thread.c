@@ -357,9 +357,17 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-
   enum intr_level level = intr_disable();
+
+  if(list_empty(&thread_current()->donors)) {
+    thread_current()->priority = new_priority; 
+    thread_current()->base_priority = new_priority;
+  } else if(new_priority > thread_current()->priority) {
+    thread_current()->priority = new_priority;
+    thread_current()->base_priority = new_priority;
+  } else {
+    thread_current()->base_priority = new_priority;
+  }
 
   if(!list_empty(&ready_list)) {
     struct list_elem *e = list_front(&ready_list);
@@ -495,6 +503,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->base_priority = priority;
+  t->locker = NULL;
+  t->lock = NULL;
+  list_init(&t->donors);
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -636,14 +648,14 @@ void thread_wake(void) {
   }
 }
 
-bool sort_sleep(const struct list_elem *first, const struct list_elem *second, void *aux) {
+bool sort_sleep(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED) {
   struct thread *td1 = list_entry(first, struct thread, elem);
   struct thread *td2 = list_entry(second, struct thread, elem);
 
   return td1->sleep_length < td2->sleep_length;
 }
 
-bool sort_priority(const struct list_elem *first, const struct list_elem *second, void *aux) {
+bool sort_priority(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED) {
   struct thread *td1 = list_entry(first, struct thread, elem);
   struct thread *td2 = list_entry(second, struct thread, elem);
 
