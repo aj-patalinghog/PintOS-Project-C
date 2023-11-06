@@ -201,6 +201,8 @@ lock_acquire (struct lock *lock)
 
   enum intr_level level = intr_disable();
 
+  if(thread_mlfqs) goto SKIP_LA;
+
   if(lock->holder) {
     thread_current()->locker = lock->holder;
     thread_current()->lock = lock;
@@ -218,7 +220,7 @@ lock_acquire (struct lock *lock)
     thread_current()->locker = NULL;
   }
 
-
+  SKIP_LA:
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 
@@ -275,6 +277,8 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 
+  if(thread_mlfqs) goto SKIP_LR;
+
   if(list_empty(&thread_current()->donors)) {
     thread_set_priority(thread_current()->base_priority);
   } else {
@@ -303,6 +307,7 @@ lock_release (struct lock *lock)
     }
   }
 
+  SKIP_LR:
   intr_set_level(level);
 }
 
